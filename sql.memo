@@ -1,0 +1,40 @@
+In [23]:  res = conn.execute(text("INSERT INTO `user` SET `name`=:name, `token`=:token, `leader_card_id`=:leader_car
+    ...: d_id"),dict(name="rin",token="sIFRFRG",leader_card_id=12))
+2022-03-10 05:10:30,784 INFO sqlalchemy.engine.Engine INSERT INTO `user` SET `name`=%s, `token`=%s, `leader_card_id`=%s
+2022-03-10 05:10:30,785 INFO sqlalchemy.engine.Engine [generated in 0.00039s] ('rin', 'sIFRFRG', 12)
+
+In [24]: res.lastrowid()
+---------------------------------------------------------------------------
+TypeError                                 Traceback (most recent call last)
+Input In [24], in <cell line: 1>()
+----> 1 res.lastrowid()
+
+TypeError: 'int' object is not callable
+
+In [25]: res.lastrowid
+Out[25]: 5
+
+In [33]: res = conn.execute(text("SELECT * FROM `user` WHERE `name`=:name"),dict(name="miku"))
+2022-03-10 05:15:52,491 INFO sqlalchemy.engine.Engine SELECT * FROM `user` WHERE `name`=%s
+2022-03-10 05:15:52,491 INFO sqlalchemy.engine.Engine [generated in 0.00047s] ('miku',)
+
+In [34]: rows = res.one()
+
+In [35]: rows.name
+Out[35]: 'miku'
+
+In [36]: rows.id
+Out[36]: 1
+
+In [37]: res = conn.execute(text("SELECT * FROM `user`"))
+2022-03-10 05:16:19,936 INFO sqlalchemy.engine.Engine SELECT * FROM `user`
+2022-03-10 05:16:19,937 INFO sqlalchemy.engine.Engine [cached since 988.8s ago] ()
+
+In [38]: for row in res:
+    ...:     print(row.name)
+    ...: 
+miku
+ruka
+kaito
+rin
+
