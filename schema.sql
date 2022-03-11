@@ -18,6 +18,7 @@ CREATE TABLE `room` (
   `live_id` INT NOT NULL,
   `joined_user_count` SMALLINT NOT NULL,
   `max_user_count` SMALLINT NOT NULL,
+  `is_start` BOOLEAN NOT NULL,
   PRIMARY KEY (`room_id`)
 );
 
@@ -26,8 +27,8 @@ CREATE TABLE `room_member` (
  `room_id` bigint NOT NULL,
  `user_id` bigint NOT NULL,
  `select_difficulty` SMALLINT NOT NULL,
- `is_me` SMALLINT NOT NULL,
- `is_host` SMALLINT NOT NULL,
+ `is_me` BOOLEAN NOT NULL,
+ `is_host` BOOLEAN NOT NULL,
  `judge_count_list` INT NOT NULL,
  `score` INT NOT NULL,
  PRIMARY KEY (`room_member_id`),

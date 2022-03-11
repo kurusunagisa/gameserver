@@ -1,5 +1,7 @@
+import json
 from calendar import c
 from enum import Enum
+from lib2to3.pytree import Base
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
@@ -7,8 +9,6 @@ from pydantic import BaseModel
 
 from . import model
 from .model import SafeUser
-
-import json
 
 app = FastAPI()
 
@@ -72,37 +72,92 @@ def update(req: UserCreateRequest, token: str = Depends(get_auth_token)):
 
 ## room関連のプログラム
 
+
+
+
+
 class RoomCreateRequest(BaseModel):
     live_id: int
-    select_difficulty: int
+    select_difficulty: model.LiveDifficulty
+
 
 class RoomCreateResponse(BaseModel):
     room_id: int
+
 
 @app.post("/room/create", response_model=RoomCreateResponse)
 def room_create(req: RoomCreateRequest, token: str = Depends(get_auth_token)):
     id = model.create_room(token, req.live_id, req.select_difficulty)
     return RoomCreateResponse(room_id=id)
 
+
 class RoomListRequest(BaseModel):
     live_id: int
+
 
 class RoomListResponse(BaseModel):
     room_info_list: list
 
 
-class RoomList(BaseModel):
+class RoomInfo(BaseModel):
     room_id: int
     live_id: int
     joined_user_count: int
     max_user_count: int
+
 
 @app.post("/room/list", response_model=RoomListResponse)
 def room_list(req: RoomListRequest):
     results = model.list_room(req.live_id)
     response = []
     for result in results:
-        response.append(RoomList(room_id=result.room_id,
-        live_id=result.live_id, joined_user_count=result.joined_user_count, max_user_count=result.max_user_count))
+        response.append(
+            RoomInfo(
+                room_id=result.room_id,
+                live_id=result.live_id,
+                joined_user_count=result.joined_user_count,
+                max_user_count=result.max_user_count,
+            )
+        )
     print(response)
     return RoomListResponse(room_info_list=response)
+
+class RoomJoinRequest(BaseModel):
+    room_id: int
+    select_difficulty: model.LiveDifficulty
+
+
+class RoomJoinResponse(BaseModel):
+    join_room_result: model.JoinRoomResult
+
+
+@app.post("/room/join", response_model=RoomJoinResponse)
+def room_join(req: RoomJoinRequest, token: str = Depends(get_auth_token)):
+    user = model.get_user_by_token(token)
+    if user is None:
+        raise HTTPException(status_code=404)
+    response = model.join_room(
+        room_id=req.room_id, select_difficulty=req.select_difficulty, user=user
+    )
+    return RoomJoinResponse(join_room_result=response)
+
+
+
+class RoomWaitRequest(BaseModel):
+    room_id: int
+
+class RoomWaitResponse(BaseModel):
+    status: model.WaitRoomStatus
+    room_user_list: list[model.RoomUser]
+
+
+@app.post("/room/wait", response_model=RoomWaitResponse)
+def room_wait(req: RoomWaitRequest, token: str = Depends(get_auth_token)):
+    user = model.get_user_by_token(token)
+    if user is None:
+        raise HTTPException(status_code=404)
+    response = model.wait_room(
+        room_id=req.room_id, user=user
+    )
+    return RoomJoinResponse(join_room_result=response)
+    
