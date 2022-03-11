@@ -73,9 +73,6 @@ def update(req: UserCreateRequest, token: str = Depends(get_auth_token)):
 ## room関連のプログラム
 
 
-
-
-
 class RoomCreateRequest(BaseModel):
     live_id: int
     select_difficulty: model.LiveDifficulty
@@ -122,6 +119,7 @@ def room_list(req: RoomListRequest):
     print(response)
     return RoomListResponse(room_info_list=response)
 
+
 class RoomJoinRequest(BaseModel):
     room_id: int
     select_difficulty: model.LiveDifficulty
@@ -142,9 +140,9 @@ def room_join(req: RoomJoinRequest, token: str = Depends(get_auth_token)):
     return RoomJoinResponse(join_room_result=response)
 
 
-
 class RoomWaitRequest(BaseModel):
     room_id: int
+
 
 class RoomWaitResponse(BaseModel):
     status: model.WaitRoomStatus
@@ -156,8 +154,5 @@ def room_wait(req: RoomWaitRequest, token: str = Depends(get_auth_token)):
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
-    response = model.wait_room(
-        room_id=req.room_id, user=user
-    )
+    response = model.wait_room(room_id=req.room_id, user=user)
     return RoomJoinResponse(join_room_result=response)
-    

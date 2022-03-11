@@ -13,9 +13,11 @@ from .db import engine
 
 ### User関連
 
+
 class LiveDifficulty(Enum):
     normal = 1
     hard = 2
+
 
 class JoinRoomResult(Enum):
     Ok = 1
@@ -23,10 +25,12 @@ class JoinRoomResult(Enum):
     Disbanded = 3
     OtherError = 4
 
+
 class WaitRoomStatus(Enum):
     Waiting = 1
     LiveStart = 2
     Dissolution = 3
+
 
 class RoomUser(BaseModel):
     user_id: int
@@ -35,6 +39,7 @@ class RoomUser(BaseModel):
     select_difficulty: LiveDifficulty
     is_me: bool
     is_host: bool
+
 
 class InvalidToken(Exception):
     """指定されたtokenが不正だったときに投げる"""
@@ -158,10 +163,7 @@ def join_room(
                 text(
                     "UPDATE `room` SET `joined_user_count`=:joined_user_count WHERE `room_id`=room_id"
                 ),
-                dict(
-                    joined_user_count=response.joined_user_count + 1,
-                    room_id=room_id
-                ),
+                dict(joined_user_count=response.joined_user_count + 1, room_id=room_id),
             )
 
             return JoinRoomResult.Ok
@@ -178,5 +180,3 @@ def wait_room(room_id: int, user: SafeUser):
             dict(room_id=room_id),
         )
         response1 = responses1.one()
-
-
