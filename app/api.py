@@ -1,3 +1,4 @@
+from calendar import c
 from enum import Enum
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -6,6 +7,8 @@ from pydantic import BaseModel
 
 from . import model
 from .model import SafeUser
+
+import json
 
 app = FastAPI()
 
@@ -65,3 +68,41 @@ def update(req: UserCreateRequest, token: str = Depends(get_auth_token)):
     # print(req)
     model.update_user(token, req.user_name, req.leader_card_id)
     return {}
+
+
+## room関連のプログラム
+
+class RoomCreateRequest(BaseModel):
+    live_id: int
+    select_difficulty: int
+
+class RoomCreateResponse(BaseModel):
+    room_id: int
+
+@app.post("/room/create", response_model=RoomCreateResponse)
+def room_create(req: RoomCreateRequest, token: str = Depends(get_auth_token)):
+    id = model.create_room(token, req.live_id, req.select_difficulty)
+    return RoomCreateResponse(room_id=id)
+
+class RoomListRequest(BaseModel):
+    live_id: int
+
+class RoomListResponse(BaseModel):
+    room_info_list: list
+
+
+class RoomList(BaseModel):
+    room_id: int
+    live_id: int
+    joined_user_count: int
+    max_user_count: int
+
+@app.post("/room/list", response_model=RoomListResponse)
+def room_list(req: RoomListRequest):
+    results = model.list_room(req.live_id)
+    response = []
+    for result in results:
+        response.append(RoomList(room_id=result.room_id,
+        live_id=result.live_id, joined_user_count=result.joined_user_count, max_user_count=result.max_user_count))
+    print(response)
+    return RoomListResponse(room_info_list=response)
