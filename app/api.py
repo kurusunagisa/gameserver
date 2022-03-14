@@ -1,7 +1,6 @@
 import json
 from calendar import c
 from enum import Enum
-#from lib2to3.pytree import Base
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,6 +9,9 @@ from pydantic import BaseModel
 from . import model
 from .model import SafeUser
 
+# from lib2to3.pytree import Base
+
+
 app = FastAPI()
 
 # Sample APIs
@@ -17,6 +19,7 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
+    """ルートディレクトリ"""
     return {"message": "Hello World"}
 
 
@@ -24,11 +27,15 @@ async def root():
 
 
 class UserCreateRequest(BaseModel):
+    """UserCreateのリクエストのスキーマ定義"""
+
     user_name: str
     leader_card_id: int
 
 
 class UserCreateResponse(BaseModel):
+    """UserCreateのレスポンスのスキーマ定義"""
+
     user_token: str
 
 
@@ -43,6 +50,7 @@ bearer = HTTPBearer()
 
 
 def get_auth_token(cred: HTTPAuthorizationCredentials = Depends(bearer)) -> str:
+    """トークンの取得"""
     assert cred is not None
     if not cred.credentials:
         raise HTTPException(status_code=401, detail="invalid credential")
@@ -51,14 +59,16 @@ def get_auth_token(cred: HTTPAuthorizationCredentials = Depends(bearer)) -> str:
 
 @app.get("/user/me", response_model=SafeUser)
 def user_me(token: str = Depends(get_auth_token)):
+    """トークンから自身の情報を取得"""
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
-    # print(f"user_me({token=}, {user=})")
     return user
 
 
 class Empty(BaseModel):
+    """空のスキーマ定義"""
+
     pass
 
 
@@ -70,33 +80,52 @@ def update(req: UserCreateRequest, token: str = Depends(get_auth_token)):
     return {}
 
 
-## room関連のプログラム
+"""
+room関連のプログラム
+"""
 
 
 class RoomCreateRequest(BaseModel):
+    """RoomCreateのリクエストのスキーマ定義"""
+
     live_id: int
     select_difficulty: model.LiveDifficulty
 
 
 class RoomCreateResponse(BaseModel):
+    """RoomCreateのレスポンスのスキーマ定義"""
+
     room_id: int
 
 
 @app.post("/room/create", response_model=RoomCreateResponse)
 def room_create(req: RoomCreateRequest, token: str = Depends(get_auth_token)):
+    """新規のルーム作成"""
     id = model.create_room(token, req.live_id, req.select_difficulty)
     return RoomCreateResponse(room_id=id)
 
 
 class RoomListRequest(BaseModel):
+    """RoomListのリクエストのスキーマ定義"""
+
     live_id: int
 
 
 class RoomListResponse(BaseModel):
+    """RoomListのレスポンスのスキーマ定義"""
+
     room_info_list: list
 
 
 class RoomInfo(BaseModel):
+    """
+    RoomInfo構造体の定義
+    room_id: ルームのid
+    live_id: 楽曲id
+    joined_user_count: 参加している人数のカウント
+    max_user_count: 参加人数上限
+    """
+
     room_id: int
     live_id: int
     joined_user_count: int
@@ -105,6 +134,7 @@ class RoomInfo(BaseModel):
 
 @app.post("/room/list", response_model=RoomListResponse)
 def room_list(req: RoomListRequest):
+    """入れるルームのリストの取得"""
     results = model.list_room(req.live_id)
     response = []
     for result in results:
@@ -116,21 +146,25 @@ def room_list(req: RoomListRequest):
                 max_user_count=result.max_user_count,
             )
         )
-    print(response)
     return RoomListResponse(room_info_list=response)
 
 
 class RoomJoinRequest(BaseModel):
+    """RoomJoinのリクエストのスキーマ定義"""
+
     room_id: int
     select_difficulty: model.LiveDifficulty
 
 
 class RoomJoinResponse(BaseModel):
+    """RoomJoinのレスポンスのスキーマ定義"""
+
     join_room_result: model.JoinRoomResult
 
 
 @app.post("/room/join", response_model=RoomJoinResponse)
 def room_join(req: RoomJoinRequest, token: str = Depends(get_auth_token)):
+    """ルームへの入室を行う"""
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
@@ -151,17 +185,21 @@ class RoomWaitResponse(BaseModel):
 
 @app.post("/room/wait", response_model=RoomWaitResponse)
 def room_wait(req: RoomWaitRequest, token: str = Depends(get_auth_token)):
+    """ルーム待機中"""
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
     response = model.wait_room(room_id=req.room_id, user=user)
     return RoomWaitResponse(status=response[0], room_user_list=response[1])
 
+
 class RoomStartRequest(BaseModel):
     room_id: int
 
+
 @app.post("/room/start", response_model=Empty)
 def room_start(req: RoomStartRequest, token: str = Depends(get_auth_token)):
+    """ライブ開始"""
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
@@ -174,12 +212,19 @@ class RoomEndRequest(BaseModel):
     judge_count_list: list[int]
     score: int
 
+
 @app.post("/room/end", response_model=Empty)
 def room_end(req: RoomEndRequest, token: str = Depends(get_auth_token)):
+    """ライブ終了時"""
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
-    _ = model.end_room(room_id=req.room_id,judge_count_list=req.judge_count_list,score=req.score,user=user)
+    _ = model.end_room(
+        room_id=req.room_id,
+        judge_count_list=req.judge_count_list,
+        score=req.score,
+        user=user,
+    )
     return {}
 
 
@@ -193,14 +238,18 @@ class RoomResultResponse(BaseModel):
 
 @app.post("/room/result", response_model=RoomResultResponse)
 def room_result(req: RoomResultRequest):
+    """ライブのリザルト"""
     result = model.result_room(room_id=req.room_id)
     return RoomResultResponse(result_user_list=result)
-    
+
+
 class RoomLeaveRequest(BaseModel):
     room_id: int
 
+
 @app.post("/room/leave", response_model=Empty)
 def room_leave(req: RoomLeaveRequest, token: str = Depends(get_auth_token)):
+    """ライブの待機画面からの退出"""
     user = model.get_user_by_token(token)
     if user is None:
         raise HTTPException(status_code=404)
