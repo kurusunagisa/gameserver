@@ -142,13 +142,13 @@ def list_room(live_id: int) -> List:
     with engine.begin() as conn:
         if live_id == 0:
             response = conn.execute(
-                text("SELECT * FROM room"),
-                {},
+                text("SELECT * FROM `room` WHERE `is_start`=:is_start"),
+                dict(is_start=WaitRoomStatus.Waiting.value),
             )
         else:
             response = conn.execute(
-                text("SELECT * FROM room WHERE live_id=:live_id"),
-                dict(live_id=live_id),
+                text("SELECT * FROM `room` WHERE live_id=:live_id AND `is_start`=:is_start"),
+                dict(live_id=live_id, is_start=WaitRoomStatus.Waiting.value),
             )
     return response.all()
 
@@ -159,11 +159,13 @@ def join_room(
     with engine.begin() as conn:
         responses = conn.execute(
             text(
-                "SELECT joined_user_count,max_user_count FROM room WHERE room_id=:room_id"
+                "SELECT joined_user_count, max_user_count, is_start FROM room WHERE room_id=:room_id FOR UPDATE"
             ),
             dict(room_id=room_id),
         )
         response = responses.one()
+        if response.is_start != WaitRoomStatus.Waiting.value:
+            return JoinRoomResult.Disbanded
         if response.joined_user_count >= response.max_user_count:
             return JoinRoomResult.RoomFull
         if response.joined_user_count == 0:
@@ -272,9 +274,15 @@ def result_room(room_id: int) -> list[ResultUser]:
             dict(room_id=room_id),
         )
         l = []
-        for i in result.all():
-            l.append(ResultUser(user_id=i.user_id, judge_count_list=list(i[1:6]), score=i.score))
-        print(l)
+        result2 = conn.execute(
+            text(
+                "SELECT `is_start` FROM `room` WHERE `room_id`=:room_id"
+            ),
+            dict(room_id=room_id),
+        )
+        if result2.one()[0] != WaitRoomStatus.Waiting.value:
+            for i in result.all():
+                l.append(ResultUser(user_id=i.user_id, judge_count_list=list(i[1:6]), score=i.score))
     return l
 
 def leave_room(room_id: int, user: SafeUser) -> None:
