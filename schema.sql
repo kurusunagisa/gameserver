@@ -27,7 +27,6 @@ CREATE TABLE `room_member` (
  `room_id` bigint NOT NULL,
  `user_id` bigint NOT NULL,
  `select_difficulty` SMALLINT NOT NULL,
- `is_me` BOOLEAN NOT NULL,
  `is_host` BOOLEAN NOT NULL,
  `judge_miss` INT NOT NULL,
  `judge_bad` INT NOT NULL,
@@ -36,6 +35,6 @@ CREATE TABLE `room_member` (
  `judge_perfect` INT NOT NULL,
  `score` INT NOT NULL,
  PRIMARY KEY (`room_member_id`),
- FOREIGN KEY (`room_id`) REFERENCES `room` (`room_id`),
- FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
+ FOREIGN KEY (`room_id`) REFERENCES `room` (`room_id`) ON DELETE CASCADE,
+ FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE
 );
