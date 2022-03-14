@@ -9,7 +9,7 @@ from urllib import response
 from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import false, text, true
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
 from .db import engine
 
@@ -67,8 +67,8 @@ def create_user(name: str, leader_card_id: int) -> str:
             result = conn.execute(
                 text("SELECT * FROM `user` WHERE `user`.token=:token"),
                 {"token": token},
-            )
-            if result.count() == 0:
+            ).first()
+            if result == None:
                 break
 
         _ = conn.execute(
@@ -86,6 +86,8 @@ def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
             text("SELECT * FROM `user` WHERE `token`=:token"), dict(token=token)
         ).one()
     except NoResultFound:
+        raise HTTPException(status_code=404)
+    except MultipleResultsFound:
         raise HTTPException(status_code=500)
     return SafeUser.from_orm(result)
 
@@ -179,6 +181,8 @@ def join_room(
             ).one()
         except NoResultFound:
             raise HTTPException(status_code=404)
+        except MultipleResultsFound:
+            raise HTTPException(status_code=500)
 
         if response.is_start != WaitRoomStatus.Waiting.value:
             return JoinRoomResult.Disbanded
@@ -229,7 +233,7 @@ def wait_room(room_id: int, user: SafeUser):
             dict(room_id=room_id),
         ).all()
         resultList = []
-        for r in enumerate(result):
+        for r in result:
             resultList.append(
                 RoomUser(
                     user_id=r.user_id,
@@ -242,7 +246,7 @@ def wait_room(room_id: int, user: SafeUser):
             )
         try:
             is_start = response.one().is_start
-        except NoResultFound:
+        except (NoResultFound, MultipleResultsFound):
             raise HTTPException(status_code=500)
         return is_start, resultList
 
@@ -257,7 +261,7 @@ def start_room(room_id: int, user: SafeUser) -> None:
                 dict(room_id=room_id, user_id=user.id),
             )
             r = response.one()[0]
-        except NoResultFound:
+        except (NoResultFound, MultipleResultsFound):
             raise HTTPException(status_code=500)
         if r:
             _ = conn.execute(
@@ -312,7 +316,7 @@ def result_room(room_id: int) -> list[ResultUser]:
                 dict(room_id=room_id),
             )
             is_start = result2.one()[0]
-        except NoResultFound:
+        except (NoResultFound, MultipleResultsFound):
             raise HTTPException(status_code=500)
         if is_start != WaitRoomStatus.Waiting.value:
             for i in result.all():
@@ -335,7 +339,7 @@ def leave_room(room_id: int, user: SafeUser) -> None:
                 dict(room_id=room_id, user_id=user.id),
             )
             is_host = response.one()[0]
-        except NoResultFound:
+        except (NoResultFound, MultipleResultsFound):
             raise HTTPException(status_code=500)
         if is_host:
             # 他にメンバーがいるか確認
