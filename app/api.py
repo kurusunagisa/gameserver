@@ -155,4 +155,54 @@ def room_wait(req: RoomWaitRequest, token: str = Depends(get_auth_token)):
     if user is None:
         raise HTTPException(status_code=404)
     response = model.wait_room(room_id=req.room_id, user=user)
-    return RoomJoinResponse(join_room_result=response)
+    return RoomWaitResponse(status=response[0], room_user_list=response[1])
+
+class RoomStartRequest(BaseModel):
+    room_id: int
+
+@app.post("/room/start", response_model=Empty)
+def room_start(req: RoomStartRequest, token: str = Depends(get_auth_token)):
+    user = model.get_user_by_token(token)
+    if user is None:
+        raise HTTPException(status_code=404)
+    _ = model.start_room(room_id=req.room_id, user=user)
+    return {}
+
+
+class RoomEndRequest(BaseModel):
+    room_id: int
+    judge_count_list: list[int]
+    score: int
+
+@app.post("/room/end", response_model=Empty)
+def room_end(req: RoomEndRequest, token: str = Depends(get_auth_token)):
+    user = model.get_user_by_token(token)
+    if user is None:
+        raise HTTPException(status_code=404)
+    _ = model.end_room(room_id=req.room_id,judge_count_list=req.judge_count_list,score=req.score,user=user)
+    return {}
+
+
+class RoomResultRequest(BaseModel):
+    room_id: int
+
+
+class RoomResultResponse(BaseModel):
+    result_user_list: list[model.ResultUser]
+
+
+@app.post("/room/result", response_model=RoomResultResponse)
+def room_result(req: RoomResultRequest):
+    result = model.result_room(room_id=req.room_id)
+    return RoomResultResponse(result_user_list=result)
+    
+class RoomLeaveRequest(BaseModel):
+    room_id: int
+
+@app.post("/room/leave", response_model=Empty)
+def room_leave(req: RoomLeaveRequest, token: str = Depends(get_auth_token)):
+    user = model.get_user_by_token(token)
+    if user is None:
+        raise HTTPException(status_code=404)
+    _ = model.leave_room(room_id=req.room_id, user=user)
+    return {}
