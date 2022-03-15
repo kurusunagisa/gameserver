@@ -2,16 +2,41 @@ import json
 import uuid
 from email.policy import HTTP
 from enum import Enum, IntEnum
-from os import stat
+from os import stat, path
 from typing import List, Optional
 from urllib import response
+from anyio import current_time
 
 from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import false, text, true
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
-
 from .db import engine
+from time import time
+
+from logging import getLogger, StreamHandler, Formatter, DEBUG, INFO, FileHandler
+
+# ロガーオブジェクト
+logger = getLogger(__name__)
+# ログが複数回表示されるのを防止
+logger.propagate = False
+# ロガー自体のロギングレベル
+logger.setLevel(DEBUG)
+
+fh = FileHandler("debug.log")
+fh.setLevel(DEBUG)
+fh.setFormatter(Formatter('%(asctime)s - %(levelname)s - %(filename)s - %(name)s - %(funcName)s - %(message)s'))
+
+# ログを標準出力へ
+sh = StreamHandler()
+# ロギングのフォーマット
+sh.setFormatter(Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+# このハンドラのロギングレベル
+sh.setLevel(DEBUG)
+# ロガーにハンドラを追加
+logger.addHandler(fh)
+logger.addHandler(sh)
+
 
 # User関連
 
@@ -77,6 +102,7 @@ def create_user(name: str, leader_card_id: int) -> str:
             ),
             {"name": name, "token": token, "leader_card_id": leader_card_id},
         )
+        logger.debug("{}".format(token))
     return token
 
 
@@ -86,8 +112,10 @@ def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
             text("SELECT * FROM `user` WHERE `token`=:token"), dict(token=token)
         ).one()
     except NoResultFound:
+        logger.error('NoResultFound')
         raise HTTPException(status_code=404)
     except MultipleResultsFound:
+        logger.error('MultipleResultsFound')
         raise HTTPException(status_code=500)
     return SafeUser.from_orm(result)
 
@@ -114,9 +142,9 @@ def create_room(token: str, live_id: int, select_difficulty: int) -> int:
     with engine.begin() as conn:
         response = conn.execute(
             text(
-                "INSERT INTO `room` SET `live_id`=:live_id, `joined_user_count`=:joined_user_count, `max_user_count`=:max_user_count, `is_start`=:is_start"
+                "INSERT INTO `room` SET `live_id`=:live_id, `joined_user_count`=:joined_user_count, `max_user_count`=:max_user_count, `is_start`=:is_start, `time`=:time"
             ),
-            dict(live_id=live_id, joined_user_count=1, max_user_count=4, is_start=1),
+            dict(live_id=live_id, joined_user_count=1, max_user_count=4, is_start=1, time=0),
         )
         user = get_user_by_token(token)
         _ = conn.execute(
@@ -278,6 +306,7 @@ def end_room(
     while len(judge_count_list) < 5:
         judge_count_list.append(0)
     with engine.begin() as conn:
+        current_time = int(time())
         _ = conn.execute(
             text(
                 "UPDATE `room_member` SET `judge_perfect`=:judge_perfect, `judge_great`=:judge_great, `judge_good`=:judge_good, `judge_bad`=:judge_bad, `judge_miss`=:judge_miss, `score`=:score WHERE `user_id`=:user_id AND `room_id`=:room_id"
@@ -292,6 +321,15 @@ def end_room(
                 user_id=user.id,
                 room_id=room_id,
             ),
+        )
+        _ = conn.execute(
+            text(
+                "UPDATE `room` SET `time`=CASE WHEN 0 then :new_time ELSE `time` END WHERE room_id=:room_id" 
+            ),
+            dict(
+                new_time=current_time,
+                room_id=room_id,
+            )
         )
 
 
@@ -312,14 +350,16 @@ def result_room(room_id: int) -> list[ResultUser]:
             )
             resultList = []
             result2 = conn.execute(
-                text("SELECT `is_start` FROM `room` WHERE `room_id`=:room_id"),
+                text("SELECT `is_start`, `time` FROM `room` WHERE `room_id`=:room_id"),
                 dict(room_id=room_id),
             )
-            is_start = result2.one()[0]
+            room_result = result2.one()
         except (NoResultFound, MultipleResultsFound):
             raise HTTPException(status_code=500)
-        if is_start != WaitRoomStatus.Waiting.value:
+        if room_result.is_start != WaitRoomStatus.Waiting.value:
             for i in result.all():
+                if time()-room_result.time < 5 and sum(i[1:6]) == 0:
+                    return []
                 resultList.append(
                     ResultUser(
                         user_id=i.user_id, judge_count_list=list(i[1:6]), score=i.score
@@ -334,7 +374,7 @@ def leave_room(room_id: int, user: SafeUser) -> None:
             # ホストか確認
             response = conn.execute(
                 text(
-                    "SELECT `is_host` FROM `room_member` WHERE `room_id`=:room_id AND `user_id`=:user_id"
+                    "SELECT `is_host` FROM `room_member` WHERE `room_id`=:room_id AND `user_id`=:user_id FOR UPDATE"
                 ),
                 dict(room_id=room_id, user_id=user.id),
             )
@@ -356,6 +396,18 @@ def leave_room(room_id: int, user: SafeUser) -> None:
                         ),
                         dict(is_host=True, user_id=i[0], room_id=room_id),
                     )
+                    joined_user_count = conn.execute(
+                        text(
+                            "SELECT `joined_user_count` FROM `room` WHERE `room_id`=:room_id"
+                        ),
+                        dict(room_id=room_id),
+                    ).one()
+                    _ = conn.execute(
+                        text(
+                            "UPDATE `room` SET `joined_user_count`=:joined_user_count WHERE `room_id`=:room_id"
+                        ),
+                        dict(joined_user_count=joined_user_count[0]-1, room_id=room_id),
+                    )
                     _ = conn.execute(
                         text(
                             "DELETE FROM `room_member` WHERE `user_id`=:user_id AND `room_id`=:room_id"
@@ -376,7 +428,28 @@ def leave_room(room_id: int, user: SafeUser) -> None:
                 ),
             )
             # 部屋をデータベースから消す
+            """
             _ = conn.execute(
                 text("DELETE FROM `room` WHERE `room_id`=:room_id"),
                 dict(room_id=room_id),
+            )
+            """
+        else:
+            joined_user_count = conn.execute(
+                text(
+                    "SELECT `joined_user_count` FROM `room` WHERE `room_id`=:room_id"
+                ),
+                dict(room_id=room_id),
+            ).one()
+            _ = conn.execute(
+                text(
+                    "UPDATE `room` SET `joined_user_count`=:joined_user_count WHERE `room_id`=:room_id"
+                ),
+                dict(joined_user_count=joined_user_count[0]-1, room_id=room_id),
+            )
+            _ = conn.execute(
+                text(
+                    "DELETE FROM `room_member` WHERE `user_id`=:user_id AND `room_id`=:room_id"
+                ),
+                dict(user_id=user.id, room_id=room_id),
             )
