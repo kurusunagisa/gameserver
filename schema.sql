@@ -7,10 +7,10 @@ DROP TABLE IF EXISTS `room_member`;
 CREATE TABLE `user` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `name` varchar(255) DEFAULT NULL,
-  `token` varchar(255) DEFAULT NULL,
+  `hashed_token` varchar(255) DEFAULT NULL,
   `leader_card_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `token` (`token`)
+  UNIQUE KEY `hashed_token` (`hashed_token`)
 );
 
 CREATE TABLE `room` (
