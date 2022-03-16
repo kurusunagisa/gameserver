@@ -451,7 +451,7 @@ def result_room(room_id: int) -> list[ResultUser]:
             if result is None:
                 logger.warn("result not found, bad /room/result was called")
             for i in result.all():
-                if time() - room_result.time < 5 and sum(i[1:6]) == 0:
+                if time() - room_result.time < 5 or sum(i[1:6]) == 0:
                     return []
                 resultList.append(
                     ResultUser(
