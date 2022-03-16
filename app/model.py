@@ -100,6 +100,7 @@ class SafeUser(BaseModel):
 
 
 def create_user(name: str, leader_card_id: int) -> str:
+    logger.info("Enter create_user")
     """Create new user and returns their token"""
     with engine.begin() as conn:
         # トークンが既存のものと衝突しなくなるまでトークンを生成する
@@ -149,6 +150,7 @@ def get_user_by_token(token: str) -> Optional[SafeUser]:
 
 
 def update_user(token: str, name: str, leader_card_id: int) -> None:
+    logger.info("Enter update_user")
     with engine.begin() as conn:
         hashed_token = sha256(token.encode()).hexdigest()
         start = perf_counter()
@@ -167,6 +169,7 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
 
 
 def create_room(token: str, live_id: int, select_difficulty: int) -> int:
+    logger.info("Enter create_room")
     with engine.begin() as conn:
         start = perf_counter()
         response = conn.execute(
@@ -220,6 +223,7 @@ class RoomList(BaseModel):
 
 
 def list_room(live_id: int) -> List:
+    logger.info("Enter list_room")
     with engine.begin() as conn:
         if live_id == 0:
             start = perf_counter()
@@ -247,6 +251,7 @@ def list_room(live_id: int) -> List:
 def join_room(
     room_id: int, select_difficulty: LiveDifficulty, user: SafeUser
 ) -> JoinRoomResult:
+    logger.info("Enter join_room")
     with engine.begin() as conn:
         try:
             start = perf_counter()
@@ -309,6 +314,7 @@ def join_room(
 
 # 戻り値が複数の時のアノテーション
 def wait_room(room_id: int, user: SafeUser):
+    logger.info("Enter wait_room")
     with engine.begin() as conn:
         start = perf_counter()
         response = conn.execute(
@@ -350,6 +356,7 @@ def wait_room(room_id: int, user: SafeUser):
 
 
 def start_room(room_id: int, user: SafeUser) -> None:
+    logger.info("Enter start_room")
     with engine.begin() as conn:
         try:
             start = perf_counter()
@@ -379,6 +386,7 @@ def start_room(room_id: int, user: SafeUser) -> None:
 def end_room(
     room_id: int, score: int, user: SafeUser, judge_count_list: list[int]
 ) -> None:
+    logger.info("Enter end_room")
     while len(judge_count_list) < 5:
         judge_count_list.append(0)
     with engine.begin() as conn:
@@ -423,6 +431,7 @@ class ResultUser(BaseModel):
 
 
 def result_room(room_id: int) -> list[ResultUser]:
+    logger.info("Enter result_room")
     with engine.begin() as conn:
         try:
             start = perf_counter()
@@ -462,6 +471,7 @@ def result_room(room_id: int) -> list[ResultUser]:
 
 
 def leave_room(room_id: int, user: SafeUser) -> None:
+    logger.info("Enter leave_room")
     with engine.begin() as conn:
         try:
             # ホストか確認
